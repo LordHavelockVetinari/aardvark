@@ -1,0 +1,34 @@
+// Print infinite asterisks.
+async asterisks() {
+    print "*"
+    await yield()
+    await asterisks()
+}
+
+// Poll task; return void.
+async pollv(task) {
+    await poll(task, void())
+}
+
+// Run task1, then task2.
+async chain(task1, task2) {
+    await task1
+    await task2
+}
+
+// Poll task n times.
+async polls(task, n) {
+    await await poll(n, chain(pollv(task), polls(task, n)))
+}
+
+// Yield three times.
+async three() {
+    await yield()
+    await yield()
+    await yield()
+}
+
+// Print six asterisks in an overcomplicated way.
+async main() {
+    await polls(asterisks(), chain(three(), three()))
+}

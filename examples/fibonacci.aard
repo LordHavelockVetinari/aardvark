@@ -1,0 +1,56 @@
+// Run a task and return void.
+async do(task) {
+    await task
+}
+
+// Run two tasks.
+async chain(a, b) {
+    await a
+    await b
+}
+
+// Increment a number.
+async inc(n) {
+    await yield()
+    return inc(await n)
+}
+
+// Add two numbers.
+async add(a, b) {
+    return add(await a, await b)
+}
+
+// Clone a number, consuming it.
+async clone1(n) {
+    return await await poll(do(n), inc(clone1(n)))
+}
+
+// Get another clone of a number.
+// Only works after awaiting clone1().
+async clone2(n) {
+    return await await n
+}
+
+// Print an asterisk.
+async asterisk() {
+    print "*"
+}
+
+// Print n asterisks.
+async asterisks(n) {
+    await await poll(do(n), chain(asterisk(), asterisks(n)))
+}
+
+// Print the Fibonacci sequence as astrisks, starting from terms a and b.
+async fib(a, b) {
+    b1 = await clone1(b)
+    b2 = clone2(b)
+    await asterisks(a)
+    println ""
+    await fib(b1, add(await a, b2))
+}
+
+// Print the Fibonacci sequence as asterisks.
+async main() {
+    await fib(inc(void()), inc(void()))
+}

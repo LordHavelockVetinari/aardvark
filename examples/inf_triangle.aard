@@ -1,0 +1,18 @@
+// Prints a line of asterisks.
+// Returns a new task just like this one, which prints a longer line.
+async line(line) {
+    print "*"
+    return line(await line)
+}
+
+// Prints an infinite triangle, given a task that prints the first line.
+async triangle(line) {
+    await line
+    println ""
+    await triangle(line(await line))
+}
+
+// Prints an infinite triangle.
+async main() {
+    await triangle(line(void()))
+}
