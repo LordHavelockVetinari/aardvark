@@ -1,0 +1,72 @@
+// Rule 124.
+// This is actually Rule 110 printed backwards.
+
+async cell0(next) {
+    return next
+}
+
+async cell1(next) {
+    await yield()
+    return next
+}
+
+async endLine() {
+    await yield()
+    await yield()
+}
+
+async awaitRet(task, value) {
+    await task
+    return value
+}
+
+async if0(stream, then, else) {
+    return await await poll(awaitRet(stream, then), else)
+}
+
+async print0(stream) {
+    print " "
+    return cell0(await printLine(await stream))
+}
+
+async print1(stream) {
+    print "#"
+    return cell1(await printLine(await stream))
+}
+
+async printEnd() {
+    println ""
+    return endLine()
+}
+
+async printLine(stream) {
+    return await if0(stream, print0(stream), if0(stream, print1(stream), printEnd()))
+}
+
+async state00(getStream) {
+    stream = await getStream
+    return await if0(stream, cell0(state00(stream)), if0(stream, cell0(state10(stream)), cell0(cell0(endLine()))))
+}
+
+async state01(getStream) {
+    stream = await getStream
+    return await if0(stream, cell1(state00(stream)), if0(stream, cell1(state10(stream)), cell1(cell0(endLine()))))
+}
+
+async state10(getStream) {
+    stream = await getStream
+    return await if0(stream, cell1(state01(stream)), if0(stream, cell1(state11(stream)), cell1(cell1(endLine()))))
+}
+
+async state11(getStream) {
+    stream = await getStream
+    return await if0(stream, cell1(state01(stream)), if0(stream, cell0(state11(stream)), cell1(cell1(endLine()))))
+}
+
+async loop(stream) {
+    await loop(await state00(printLine(stream)))
+}
+
+async main() {
+    await loop(cell1(endLine()))
+}
