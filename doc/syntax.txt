@@ -4,10 +4,10 @@ function = 'async' ws ident ws '(' ws {ident ws ',' ws} [ident ws] ')' ws '{' ws
 
 statement = expression | ident ws '=' ws expression | 'return' ws expression | 'print' ws string | 'println' ws string
 
-expression = ident | '(' ws  expr ws ')' | 'await' ws expression | ident ws '(' ws {expression ws ',' ws} [expression ws] ')'
+expression = ident | '(' ws expression ws ')' | 'await' ws expression | ident ws '(' ws {expression ws ',' ws} [expression ws] ')'
 
 ident = (alphabetic_char | '_') {alphanumeric_char | '_'}
 
-string = '"' {char_except '"', '\\' | '\\n' | '\\\"' | '\\\\' } '"'
+string = '"' {char_except('"', '\\') | '\\n' | '\\"' | '\\\\' } '"'
 
 ws = whitespace_char | newline | '//' {char} newline | '/*' {char} '*/'
