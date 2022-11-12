@@ -10,4 +10,4 @@ ident = (alphabetic_char | '_') {alphanumeric_char | '_'}
 
 string = '"' {char_except('"', '\\') | '\\n' | '\\"' | '\\\\' } '"'
 
-ws = whitespace_char | newline | '//' {char} newline | '/*' {char} '*/'
+ws = {whitespace_char | newline | '//' {char} newline | '/*' {char} '*/'}
