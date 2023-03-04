@@ -1,5 +1,7 @@
 // Prints a line of asterisks.
-// Returns a new task just like this one, which prints a longer line.
+// Accepts an asterisk-printing task: either line() or void() (which prints 0 asterisks).
+// Prints as many asterisks as that task, plus one.
+// Returns a copy of itself.
 async line(line) {
     print "*"
     return line(await line)
