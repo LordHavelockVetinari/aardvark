@@ -1,0 +1,559 @@
+/*
+A "standard library" for Aardvark.
+This library contains many useful functions, like:
+- Task combinators.
+- Boolean functions.
+- Unsigned integer functions.
+- Formatting functions.
+- Some demo functions.
+
+Since Aardvark doesn't actually have a module system, you can use these functions in your program by
+either copying and pasting them manually into your program or using some preprocessor to do this automatically.
+
+About type annotations:
+Each function here has a Haskell-like type annotation.
+Aardvark is a typeless language, but these annotations provide hints about the way the functions should be used.
+In type annotations:
+- `Bool` is a Boolean. (See how Booleans are represented below.)
+- `Uint` is an unsigned integer. (See how integers are represented below.)
+- `Task Void` is a task that returns void(), or a task whose returns value is not important.
+- `Task T` (for any type `T`) is a task that returns `T`.
+  For example, `Task Uint` is a task that returns an integer.
+- `A -> B -> ... -> R` is a function that takes A, B, ... and returns R.
+  For example, `Uint -> Task Bool` is a function that takes an integer and returns a task that returns a Boolean.
+  The return value of a function is the one it returns *before* being awaited.
+  For example, if a function `f` is annotated: `f :: Bool -> Bool`,
+  you'll probably want to write `f(b)`, not `await f(b)`.
+  If `f` needed to be awaited, it would be annotated: `f :: Bool -> Task Bool`.
+- `a` is a type parameter. It means that a function is generic and can work with any type.
+  For example, `a -> Task a` is a function that can accept any type and return a task that returns the same type.
+
+For example, here are type annotations for the builtin functions:
+    void :: Task Void
+    yield :: Task Void
+    ready :: Task a -> a -> Task a
+    poll :: Task a -> a -> Task a
+*/
+
+
+// General-Purpose Task Combinators:
+// These functions construct complex tasks from simpler ones.
+
+// do :: Task Void -> Task Void
+// Awaits `task` and returns void().
+async do(task) {
+    await task
+}
+
+// chain :: Task Void -> Task a -> Task a
+// Awaits `task1`, then `task2`.
+// Returns the result of `task2`.
+async chain(task1, task2) {
+    await task1
+    return await task2
+}
+
+// then :: Task Void -> a -> Task a
+// Awaits `task`, then returns `result`.
+async then(task, result) {
+    await task
+    return result
+}
+
+// defer :: a -> Task a
+// Returns `x`.
+async defer(x) {
+    return x
+}
+
+// block :: Task a -> Task a
+// Repeatedly polls `task` until it returns. Returns its result.
+async block(task) {
+    return await await poll(then(task, task), block(task))
+}
+
+
+/*
+Boolean functions:
+True and False are represented by yield() and void(), respectively.
+You can also use the aliases true() and false().
+
+Functions that accept a Boolean usually consume it, so you should use each Boolean only once.
+For example, this returns False, not True, as the variable `b` gets consumed and turned into False:
+    b = true()
+    return and(b, b)
+
+In fact, Boolean functions are very flexible and can accept any task.
+They treat any task that returns immediately as False and any task that pauses as True.
+In particular, they can accept integers, treating 0 as False and other integers as True.
+
+Boolean functions are guaranteed to poll their arguments up to once.
+In other words, if they run a task and it pauses, they will not resume it.
+*/
+
+// true :: Bool
+// Logical True.
+async true() {
+    await yield()
+}
+
+// false :: Bool
+// Logical False.
+async false() {}
+
+// bool :: Task Void -> Bool
+// Polls `task`. Returns True if it pauses, or False if it returns immediately.
+async bool(task) {
+    await await poll(do(task), true())
+}
+
+// and :: Bool -> Bool -> Bool
+// Logical AND.
+async and(a, b) {
+    await await poll(do(a), bool(b))
+}
+
+// or :: Bool -> Bool -> Bool
+// Logical OR.
+async or(a, b) {
+    await bool(chain(a, b))
+}
+
+// not :: Bool -> Bool -> Bool
+// Logical NOT.
+async not(b) {
+    await await poll(then(b, true()), false())
+}
+
+// select :: Bool -> a -> a -> Task a
+// Returns `then` if `cnd` is True, or `else` otherwise.
+async select(cnd, then, else) {
+    return await poll(then(cnd, else), then)
+}
+
+// when :: Bool -> Task a -> Task Void
+// If `cnd` is True, awaits `then` and returns its result.
+// Otherwise, returns void().
+async when(cnd, then) {
+    return await await poll(do(cnd), then)
+}
+
+// if :: Bool -> Task a -> Task a -> Task a
+// If `cnd` is True, awaits `then` and returns its result.
+// Otherwise, awaits `else` and returns its result.
+async if(cnd, then, else) {
+    return await await poll(then(cnd, else), then)
+}
+
+
+/*
+Unsigned (nonnegative) integer functions:
+An integer N is represented by a task that pauses N times before returning.
+
+Functions that accept an integer usually consume it, so you should use each integer only once.
+For example, this returns 4, not 8, as the variable `n` gets consumed and turned into 0:
+    n = four()
+    return add(n, n)
+
+To make integers easier to use, integer tasks also
+return a copy of themselves (which hasn't been consumed).
+For example, in the following program, the variables `a`, `b`, and `c` will all be equal to 5:
+    a = five()
+    b = await five()
+    c = await await five()
+
+The uint() function accepts a task that pauses N times and returns N as an integer.
+You can use it to consume an integer and create two copies of it - for example, this returns 8, as expected:
+    n = four()
+    nCopy1 = await uint(n)
+    nCopy2 = await n
+    return add(nCopy1, nCopy2)
+*/
+
+// zero :: Uint
+// The number 0.
+async zero() {}
+
+// one :: Uint
+// The number 1.
+async one() {
+    await yield()
+    return one()
+}
+
+// two :: Uint
+// The number 2.
+async two() {
+    await yield() await yield()
+    return two()
+}
+
+// three :: Uint
+// The number 3.
+async three() {
+    await yield() await yield() await yield()
+    return three()
+}
+
+// four :: Uint
+// The number 4.
+async four() {
+    await yield() await yield() await yield() await yield()
+    return four()
+}
+
+// five :: Uint
+// The number 5.
+async five() {
+    await yield() await yield() await yield() await yield()
+    await yield()
+    return five()
+}
+
+// six :: Uint
+// The number 6.
+async six() {
+    await yield() await yield() await yield() await yield()
+    await yield() await yield()
+    return six()
+}
+
+// seven :: Uint
+// The number 7.
+async seven() {
+    await yield() await yield() await yield() await yield()
+    await yield() await yield() await yield()
+    return seven()
+}
+
+// eight :: Uint
+// The number 8.
+async eight() {
+    await yield() await yield() await yield() await yield()
+    await yield() await yield() await yield() await yield()
+    return eight()
+}
+
+// nine :: Uint
+// The number 9.
+async nine() {
+    await yield() await yield() await yield() await yield()
+    await yield() await yield() await yield() await yield()
+    await yield()
+    return nine()
+}
+
+// ten :: Uint
+// The number 10.
+async ten() {
+    await yield() await yield() await yield() await yield()
+    await yield() await yield() await yield() await yield()
+    await yield() await yield()
+    return ten()
+}
+
+// inc :: Uint -> Uint
+// Returns `n` + 1.
+async inc(n) {
+    await yield()
+    return inc(await n)
+}
+
+// unpoll :: Task Uint -> Uint
+// `n` is a nonzero integer task that has been polled once.
+// Returns `n` as if it had never been polled.
+async unpoll(n) {
+    await yield()
+    return await n
+}
+
+// polls :: Uint -> Task a -> a -> Task a
+// Like `poll(task, default)`, but tries to poll `task` `n` times before giving up and returning `default`.
+async polls(n, task, default) {
+    return await if(n,
+        if(task,
+            polls(n, task, default),
+            task,
+        ),
+        defer(default),
+    )
+}
+
+// uint :: Task Void -> Task Uint
+// Awaits `n`. Returns the number of times it paused.
+async uint(n) {
+    return await when(n, inc(uint(n)))
+}
+
+// dec :: Uint -> Uint
+// Returns `n` - 1.
+// Returns 0 if the result is negative.
+async dec(n) {
+    await poll(n, void())
+    return await uint(n)
+}
+
+// add :: Uint -> Uint -> Uint
+// Returns `m` + `n`.
+async add(m, n) {
+    return add(await m, await n)
+}
+
+// sub :: Uint -> Uint -> Uint
+// Returns `m` - `n`.
+// Returns 0 if the result is negative.
+async sub(m, n) {
+    return await await polls(n, do(m), uint(m))
+}
+
+// diff :: Uint -> Uint -> Task Void -> Task Uint
+// Returns the absolute value of `m` - `n`.
+// If `m` - `n` is negative, awaits `ifNeg`.
+async diff(m, n, ifNeg) {
+    return await if(n,
+        if(m,
+            diff(m, n, ifNeg),
+            chain(ifNeg, inc(uint(n))),
+        ),
+        uint(m),
+    )
+}
+
+// double :: Uint -> Uint
+// Returns `n` * 2.
+async double(n) {
+    return double(await await n)
+}
+
+async _halve_inc(n, ifOdd) {
+    return inc(await halve(n, ifOdd))
+}
+
+// halve :: Uint -> Task Void -> Task Uint
+// Returns `n` / 2 rounded down.
+// Awaits `ifOdd` if `n` is odd.
+async halve(n, ifOdd) {
+    return await when(n, if(n,
+        _halve_inc(n, ifOdd),
+        do(ifOdd),
+    ))
+}
+
+async _mul_then(m, n) {
+    n1 = await uint(n)
+    n2 = await n
+    return add(n1, await mul(m, n2))
+}
+
+// mul :: Uint -> Uint -> Uint
+// Returns `m` * `n`.
+async mul(m, n) {
+    return await when(m, _mul_then(m, n))
+}
+
+async _div_ifGe(m, n) {
+    m = await m
+    n = await n
+    return inc(div(await sub(m, n), await n))
+}
+
+// div :: Uint -> Uint -> Uint
+// Returns `m` / `n` rounded down.
+// `n` can't be 0.
+async div(m, n) {
+    return await await block(if(lt(m, n),
+        zero(),
+        _div_ifGe(m, n),
+    ))
+}
+
+async _mod_ifGe(m, n) {
+    m = await m
+    n = await n
+    return mod(await sub(m, n), await n)
+}
+
+// mod :: Uint -> Uint -> Uint
+// Returns `m` modulo `n`.
+// `n` can't be 0.
+async mod(m, n) {
+    return await await block(if(lt(m, n),
+        m,
+        _mod_ifGe(m, n),
+    ))
+}
+
+// eq :: Uint -> Uint -> Bool
+// Returns True if `m` = `n`, or False otherwise.
+async eq(m, n) {
+    await if(m,
+        when(n, eq(m, n)),
+        not(n),
+    )
+}
+
+async _lt_loop(m, n) {
+    await when(n, chain(not(m), _lt_loop(m, n)))
+}
+
+// lt :: Uint -> Uint -> Bool
+// Returns True if `m` < `n`, or False otherwise.
+async lt(m, n) {
+    await bool(_lt_loop(m, n))
+}
+
+async _isPrime_test(n, i) {
+    n = await block(n)
+    i = await block(i)
+    m = mod(await block(uint(n)), await block(uint(i)))
+    await when(m, _isPrime_loop(n, i))
+}
+
+async _isPrime_loop(n, i) {
+    n = await block(n)
+    i = inc(await block(i))
+    await chain(eq(n, i), _isPrime_test(n, i))
+}
+
+// isPrime :: Uint -> Bool
+// Checks if `n` is prime. Very inefficient.
+async isPrime(n) {
+    await bool(when(n, when(n, _isPrime_loop(n, one()))))
+}
+
+async _nextCollatz_whenOdd(n) {
+    await yield()
+    return _nextCollatz_whenOdd(await await await n)
+}
+
+// nextCollatz :: Uint -> Uint
+// Returns the next term after `n` in the Collatz sequence.
+async nextCollatz(n) {
+    isEven = yield()
+    half = await block(halve(uint(n), isEven))
+    return await if(isEven, half, _nextCollatz_whenOdd(await n))
+}
+
+
+// Formatting functions:
+
+// newline :: Task Void
+// Prints a newline.
+async newline() {
+    println ""
+}
+
+async _printBool_true() {
+    print "True"
+}
+
+async _printBool_false() {
+    print "False"
+}
+
+// printBool :: Bool -> Task Void
+// Prints the value of `b` (either "True" or "False"), without a newline.
+async printBool(b) {
+    await if(b, _printBool_true(), _printBool_false())
+}
+
+async _stars_1() {
+    print "*"
+}
+
+// stars :: Uint -> Task Void
+// Prints `n` asterisks, without a newline.
+async stars(n) {
+    await when(n, chain(_stars_1(), stars(n)))
+}
+
+async _printUint_0() { print "0" }
+async _printUint_1() { print "1" }
+async _printUint_2() { print "2" }
+async _printUint_3() { print "3" }
+async _printUint_4() { print "4" }
+async _printUint_5() { print "5" }
+async _printUint_6() { print "6" }
+async _printUint_7() { print "7" }
+async _printUint_8() { print "8" }
+async _printUint_9() { print "9" }
+
+async _printUint_digit69(d) {
+    await if(d,
+        if(d,
+            if(d,
+                _printUint_9(),
+                _printUint_8(),
+            ),
+            _printUint_7(),
+        ),
+        _printUint_6(),
+    )
+}
+
+async _printUint_digit39(d) {
+    await if(d,
+        if(d,
+            if(d,
+                _printUint_digit69(d),
+                _printUint_5(),
+            ),
+            _printUint_4(),
+        ),
+        _printUint_3(),
+    )
+}
+
+async _printUint_digit(d) {
+    await if(d,
+        if(d,
+            if(d,
+                _printUint_digit39(d),
+                _printUint_2(),
+            ),
+            _printUint_1(),
+        ),
+        _printUint_0(),
+    )
+}
+
+async _printUint_nonzero(n) {
+    await _printUint_loop(div(uint(n), ten()))
+    await _printUint_digit(mod(await n, ten()))
+}
+
+async _printUint_loop(n) {
+    await when(n, _printUint_nonzero(unpoll(n)))
+}
+
+// printUint :: Uint -> Task Void
+// Prints an integer, without a newline.
+async printUint(n) {
+    await if(n, _printUint_nonzero(unpoll(n)), _printUint_0())
+}
+
+
+// Demo/test functions:
+
+// printCollatz :: Uint -> Task Void
+// Prints the Collatz sequence, from `start` until reaching 1.
+async printCollatz(start) {
+    await printUint(uint(start))
+    println ""
+    start = await start
+    next = nextCollatz(await uint(start))
+    start = await start
+    await if(start,
+        when(start, printCollatz(next)),
+        printCollatz(one()),
+    )
+}
+
+// printPrimes :: Uint -> Task Void
+// Prints all prime numbers, starting from `start`.
+async printPrimes(start) {
+    start1 = await uint(start)
+    start2 = await start
+    await when(isPrime(start1), chain(printUint(uint(start2)), newline()))
+    await printPrimes(inc(await start2))
+}
